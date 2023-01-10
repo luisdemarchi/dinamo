@@ -167,7 +167,14 @@ export default class Dinamo {
   dynamoDB: DynamoDBDocumentClient
   tableName: string
 
-  constructor(config: DinamoConfig) {
+  constructor(config?: DinamoConfig) {
+    if (config) {
+      this.config(config);
+    }
+
+  }
+
+  config(config: DinamoConfig) {
     this.tableName = config.tableName
 
     this.client = new DynamoDBClient({
@@ -181,10 +188,11 @@ export default class Dinamo {
     })
   }
 
-  async batchGet<Type>({ keys }: BatchGet) {
+  async batchGet<Type>({ keys }: BatchGet, tableName?: string) {
+    tableName = tableName || this.tableName;
     const { Responses } = await this.dynamoDB.send(
       new BatchGetCommand({
-        RequestItems: { [this.tableName]: { Keys: keys } },
+        RequestItems: { [tableName]: { Keys: keys } },
       }),
     )
 
@@ -193,35 +201,39 @@ export default class Dinamo {
     return Object.values(Responses).flat() as Type[]
   }
 
-  async decrement<Type>({ key, field, step = 1 }: Increment) {
-    return this.increment<Type>({ key, field, step: -Math.abs(step) })
+  async decrement<Type>({ key, field, step = 1 }: Increment, tableName?: string) {
+    return this.increment<Type>({ key, field, step: -Math.abs(step) }, tableName)
   }
 
-  async delete<Type>({ key, soft = true }: Delete) {
+  async delete<Type>({ key, soft = true }: Delete, tableName?: string) {
+    tableName = tableName || this.tableName;
     const deletedAt = +new Date()
     if (soft) {
-      return this.update<Type>({ key, item: { deletedAt } })
+      return this.update<Type>({ key, item: { deletedAt } }, tableName)
     }
     return this.dynamoDB.send(
-      new DeleteCommand({ TableName: this.tableName, Key: key }),
+      new DeleteCommand({ TableName: tableName, Key: key }),
     )
   }
 
-  async get<Type>({ key }: Get) {
+  async get<Type>({ key }: Get, tableName?: string) {
+    tableName = tableName || this.tableName;
+
     const { Item } = await this.dynamoDB.send(
-      new GetCommand({ TableName: this.tableName, Key: key }),
+      new GetCommand({ TableName: tableName, Key: key }),
     )
     return Item as Type
   }
 
-  async increment<Type>({ key, field, step = 1 }: Increment) {
-    return this.update<Type>({ key, item: { [field]: { increment: step } } })
+  async increment<Type>({ key, field, step = 1 }: Increment, tableName?: string) {
+    return this.update<Type>({ key, item: { [field]: { increment: step } } }, tableName)
   }
 
-  async put({ item }: Put) {
+  async put({ item }: Put, tableName?: string) {
+    tableName = tableName || this.tableName;
     item.createdAt = +new Date()
     return this.dynamoDB.send(
-      new PutCommand({ TableName: this.tableName, Item: item }),
+      new PutCommand({ TableName: tableName, Item: item }),
     )
   }
 
@@ -235,10 +247,11 @@ export default class Dinamo {
     items = [],
     recursive,
     filterDeleted = true,
-  }: Query<Type>): Promise<{
+  }: Query<Type>, tableName?: string): Promise<{
     data: Type[]
     lastEvaluatedKey?: Record<string, string>
   }> {
+    tableName = tableName || this.tableName;
     const expressionAttributeNames = buildExpressionAttributeNames({
       ...key,
       ...input,
@@ -265,7 +278,7 @@ export default class Dinamo {
         KeyConditionExpression: keyConditionExpression,
         FilterExpression: filterExpression,
         ScanIndexForward: scanIndexForward,
-        TableName: this.tableName,
+        TableName: tableName,
         IndexName: indexName,
         Limit: limit,
         ExclusiveStartKey: exclusiveStartKey,
@@ -283,7 +296,7 @@ export default class Dinamo {
         recursive,
         indexName,
         filterDeleted,
-      })
+      }, tableName)
     }
 
     return {
@@ -298,10 +311,11 @@ export default class Dinamo {
     query,
     recursive,
     filterDeleted = true,
-  }: Scan<Type>): Promise<{
+  }: Scan<Type>, tableName?: string): Promise<{
     data: Type[]
     lastEvaluatedKey?: Record<string, string>
   }> {
+    tableName = tableName || this.tableName;
     const expressionAttributeNames = buildExpressionAttributeNames(query)
     const expressionAttributeValues = buildExpressionAttributeValues(query)
     let filterExpression = buildFilterExpression(query)
@@ -318,7 +332,7 @@ export default class Dinamo {
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         FilterExpression: filterExpression,
-        TableName: this.tableName,
+        TableName: tableName,
         ExclusiveStartKey: exclusiveStartKey,
       }),
     )
@@ -331,23 +345,24 @@ export default class Dinamo {
         items,
         query,
         recursive,
-      })
+      }, tableName)
     }
 
     return { data: items, lastEvaluatedKey: LastEvaluatedKey }
   }
 
-  async update<Type>({ key, item }: Update) {
+  async update<Type>({ key, item }: Update, tableName?: string) {
+    tableName = tableName || this.tableName;
     item.updatedAt = +new Date()
     await this.dynamoDB.send(
       new UpdateCommand({
-        TableName: this.tableName,
+        TableName: tableName,
         Key: key,
         UpdateExpression: buildUpdateExpression(item),
         ExpressionAttributeNames: buildExpressionAttributeNames(item),
         ExpressionAttributeValues: buildExpressionAttributeValues(item),
       }),
     )
-    return this.get<Type>({ key })
+    return this.get<Type>({ key }, tableName)
   }
 }

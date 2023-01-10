@@ -21,26 +21,24 @@ Then create an instance in your code:
 ```js
 import Dinamo from 'dinamo'
 
-const dinamo = new Dinamo({ tableName: 'my-table' })
+const dinamo = new Dinamo({ tableName: 'my-table' });
 ```
 
-If you are using DynamoDB in a Docker container you can pass the endpoint as a parameter:
+or
 
 ```js
-const dinamo = new Dinamo({
-  endpoint: 'http://localhost:8000',
-  tableName: 'my-table',
-})
+import Dinamo from 'dinamo'
+
+const dinamo = new Dinamo()
+dinamo.config({ tableName: 'my-table' });
 ```
 
-You can also configure the AWS SDK client logger:
+### Dinamo({tableName, endpoint, region})
 
-```js
-const dinamo = new Dinamo({
-  logger: console,
-  tableName: 'my-table',
-})
-```
+* `tableName` optional - if you want to use the library with only one table
+* `endpoint` optional - to use the connection outside of AWS, such as a docker service
+* `region` optional - choose region for AWS servers
+
 
 ## Usage
 
@@ -49,7 +47,7 @@ const dinamo = new Dinamo({
 Gets items in batch.
 
 ```js
-await dinamo.batchGet({ keys: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] })
+await dinamo.batchGet({ keys: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }, tableName?)
 ```
 
 ### `decrement`
